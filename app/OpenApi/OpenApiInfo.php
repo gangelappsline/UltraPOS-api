@@ -20,7 +20,10 @@ use OpenApi\Attributes as OA;
     contact: new OA\Contact(email: 'support@ultrapos.test', name: 'UltraPOS Support'),
     license: new OA\License(name: 'MIT'),
 )]
-#[OA\Server(url: 'http://localhost:8000/api/v1', description: 'Local development')]
+#[OA\Server(
+    url: L5_SWAGGER_CONST_HOST,
+    description: 'Configured with L5_SWAGGER_CONST_HOST (see .env — http://localhost:8000/api/v1 by default)'
+)]
 #[OA\SecurityScheme(
     type: 'oauth2',
     securityScheme: 'passport',

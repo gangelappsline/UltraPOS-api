@@ -26,28 +26,15 @@ class DemoBusinessSeeder extends Seeder
     public function run(): void
     {
         // ── Owner ──────────────────────────────────────────────────────
-        $owner = User::firstOrCreate(
-            ['email' => env('DEMO_BUSINESS_EMAIL', 'demo@ultrapos.test')],
-            [
-                'name' => 'Demo Owner',
-                'password' => env('DEMO_BUSINESS_PASSWORD', 'ChangeMe123!'),
-                'email_verified_at' => now(),
-                'is_active' => true,
-            ],
+        $owner = $this->seedUser(
+            env('DEMO_BUSINESS_EMAIL', 'demo@ultrapos.test'),
+            'Demo Owner',
+            env('DEMO_BUSINESS_PASSWORD', 'ChangeMe123!'),
+            UserRole::BUSINESS,
         );
-        $owner->syncRoles([UserRole::BUSINESS->value]);
 
         // ── Seller ─────────────────────────────────────────────────────
-        $seller = User::firstOrCreate(
-            ['email' => 'seller@ultrapos.test'],
-            [
-                'name' => 'Demo Seller',
-                'password' => 'ChangeMe123!',
-                'email_verified_at' => now(),
-                'is_active' => true,
-            ],
-        );
-        $seller->syncRoles([UserRole::SELLER->value]);
+        $seller = $this->seedUser('seller@ultrapos.test', 'Demo Seller', 'ChangeMe123!', UserRole::SELLER);
 
         // ── Tenant ─────────────────────────────────────────────────────
         $business = Business::firstOrCreate(
@@ -171,5 +158,33 @@ class DemoBusinessSeeder extends Seeder
                 'is_active' => true,
             ],
         );
+    }
+
+    /**
+     * Creates (or reuses) a seeded user.
+     *
+     * email_verified_at cannot go through mass assignment: it is deliberately
+     * absent from User::$fillable so no endpoint can self-verify an address.
+     * Seeders are trusted, hence forceFill().
+     */
+    private function seedUser(string $email, string $name, string $password, UserRole $role): User
+    {
+        /** @var User $user */
+        $user = User::firstOrCreate(
+            ['email' => $email],
+            [
+                'name' => $name,
+                'password' => $password,
+                'is_active' => true,
+            ],
+        );
+
+        if (! $user->hasVerifiedEmail()) {
+            $user->forceFill(['email_verified_at' => now()])->save();
+        }
+
+        $user->syncRoles([$role->value]);
+
+        return $user;
     }
 }

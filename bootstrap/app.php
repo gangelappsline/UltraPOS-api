@@ -19,6 +19,15 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/api/health/ping',
     )
+    // Register the Artisan commands in app/Console/Commands. Laravel only
+    // auto-discovers that folder through withCommands(); passing `commands`
+    // to withRouting() loads just the Closure-based routes file, so every
+    // `ultrapos:*` command was reported as "command not found" and
+    // `php artisan schedule:run` silently failed.
+    ->withCommands([
+        __DIR__.'/../app/Console/Commands',
+        __DIR__.'/../routes/console.php',
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         // API-wide middleware: force JSON negotiation + request tracing id.
         $middleware->api(prepend: [

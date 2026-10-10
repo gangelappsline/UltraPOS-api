@@ -83,7 +83,12 @@ final class Handler
             $e instanceof UnauthorizedException => $handler->errorResponse(
                 'This action is unauthorized',
                 ErrorCode::UNAUTHORIZED,
-                $e instanceof UnauthorizedException ? ['required' => $e->getRequiredPermissions?() ?? []] : null,
+                $e instanceof UnauthorizedException
+                    ? [
+                        'required_roles' => $e->getRequiredRoles(),
+                        'required_permissions' => $e->getRequiredPermissions(),
+                    ]
+                    : null,
                 403
             ),
 

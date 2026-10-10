@@ -247,7 +247,10 @@ class AuthService
         $ttlMinutes = (int) config('passport.token_lifetimes.personal_access', 10080);
         $expiresAt = Carbon::now()->addMinutes($ttlMinutes);
 
-        $newToken = $user->createToken($deviceName, $user->tokenScopes(), $expiresAt);
+        // Passport 13: createToken(name, scopes). The lifetime comes from
+        // Passport::personalAccessTokensExpireIn() (AuthServiceProvider), which
+        // reads the same config key used here — so expires_at is truthful.
+        $newToken = $user->createToken($deviceName, $user->tokenScopes());
 
         return [
             'access_token' => $newToken->accessToken,

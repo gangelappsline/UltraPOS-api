@@ -9,12 +9,26 @@ use App\Models\Business;
 use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Laravel\Passport\Client as PassportClient;
+use Laravel\Passport\ClientRepository;
 use Laravel\Passport\Passport;
-use Laravel\Passport\PersonalAccessClient;
 use Spatie\Permission\Models\Role;
 
 abstract class TestCase extends BaseTestCase
 {
+    /**
+     * Passport signs its tokens with the RSA pair in storage/. Fresh clones have
+     * none (it is git-ignored), so generate it once per test run instead of
+     * failing register/login tests with "Invalid key supplied".
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (! is_file(Passport::keyPath('oauth-private.key'))) {
+            $this->artisan('passport:keys')->assertSuccessful();
+        }
+    }
+
     /** Ensure the Spatie roles exist (web guard, matches default guard). */
     protected function seedRoles(): void
     {
@@ -83,17 +97,11 @@ abstract class TestCase extends BaseTestCase
     protected function setUpPersonalAccessClient(): void
     {
         /** @var PassportClient $client */
-        $client = PassportClient::forceCreate([
-            'user_id' => null,
-            'name' => 'UltraPOS Testing Personal Access Client',
-            'secret' => 'testing-secret',
-            'provider' => 'users',
-            'redirect' => 'http://localhost',
-            'personal_access_client' => true,
-            'password_client' => false,
-            'revoked' => false,
-        ]);
+        $client = app(ClientRepository::class)->createPersonalAccessGrantClient(
+            'UltraPOS Testing Personal Access Client',
+            'users',
+        );
 
-        PersonalAccessClient::forceCreate(['client_id' => $client->id]);
+        $this->assertNotNull($client->getKey());
     }
 }

@@ -1,20 +1,40 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # UltraPOS API — PHP 8.3 FPM image
-# Multi-stage: composer assets are installed in a builder stage to keep the
-# final image lean and to avoid shipping credentials.
+#
+# Multi-stage: Composer dependencies are installed in a builder stage so the
+# runtime image needs no composer/phar downloads.
+#
+# NOTE: this repo has no committed composer.lock, so the builder runs
+# `composer update` when the lock file is absent (first `docker compose build`
+# resolves the versions). Committing a composer.lock makes builds reproducible
+# and turns that into `composer install`.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── Stage 1: install PHP + JS-free dependencies via Composer ─────────────────
+# ── Stage 1: vendor tree ─────────────────────────────────────────────────────
 FROM composer:2 AS vendor
 
 WORKDIR /app
+
+# Only dependency manifests are copied, so application changes don't invalidate
+# this (slow) layer.
 COPY composer.json composer.lock* ./
-RUN composer install \
-        --no-dev \
-        --no-scripts \
-        --no-interaction \
-        --prefer-dist \
-        --optimize-autoloader
+
+RUN set -eux; \
+    if [ -f composer.lock ]; then \
+        composer install \
+            --no-dev \
+            --no-scripts \
+            --no-interaction \
+            --prefer-dist \
+            --optimize-autoloader; \
+    else \
+        composer update \
+            --no-dev \
+            --no-scripts \
+            --no-interaction \
+            --prefer-dist \
+            --optimize-autoloader; \
+    fi
 
 # ── Stage 2: runtime ─────────────────────────────────────────────────────────
 FROM php:8.3-fpm-alpine AS runtime
@@ -64,16 +84,23 @@ WORKDIR /var/www/html
 # Vendor from the builder stage first (better layer caching).
 COPY --from=vendor /app/vendor ./vendor
 COPY . .
+COPY docker/entrypoint.sh /usr/local/bin/ultrapos-entrypoint
 
-RUN chown -R www-data:www-data storage bootstrap/cache \
-    && php artisan passport:keys --force 2>/dev/null || true \
-    && php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan event:cache
+# Writable dirs for logs, cache and the Passport keys.
+#
+# Deliberately NO `php artisan config:cache|route:cache` and NO
+# `passport:keys --force` here: docker-compose bind-mounts the project over
+# /var/www/html, so anything cached at build time is invisible at runtime, and
+# baking one RSA key pair into the image would ship the same OAuth signing key
+# to every deployment. The entrypoint generates keys at runtime instead.
+RUN mkdir -p bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R ug+rwX storage bootstrap/cache \
+    && chmod +x /usr/local/bin/ultrapos-entrypoint
 
-# Non-root healthcheck.
 USER www-data
 
 EXPOSE 9000
 
+ENTRYPOINT ["/usr/local/bin/ultrapos-entrypoint"]
 CMD ["php-fpm", "-F"]

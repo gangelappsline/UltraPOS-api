@@ -7,6 +7,7 @@ namespace App\Observers;
 use App\Enums\AuditAction;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 
@@ -57,8 +58,9 @@ class AuditObserver
         }
 
         try {
-            /** @var User|null $user */
-            $user = auth('api')->user();
+            // TenantContext is console-safe (auth('api') would force the
+            // Passport guard — and its RSA keys — during migrations/seeding).
+            $user = TenantContext::user();
 
             AuditLog::create([
                 'business_id' => $this->resolveBusinessId($model, $user),

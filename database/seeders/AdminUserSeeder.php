@@ -22,12 +22,18 @@ class AdminUserSeeder extends Seeder
                 'name' => env('DEFAULT_ADMIN_NAME', 'System Administrator'),
                 'password' => env('DEFAULT_ADMIN_PASSWORD', 'ChangeMe123!'),
                 'is_active' => true,
-                'email_verified_at' => now(),
             ],
         );
 
         if ($admin->trashed()) {
             $admin->restore();
+        }
+
+        // email_verified_at is intentionally NOT in User::$fillable (a client
+        // must never verify its own e-mail), so it is set outside of mass
+        // assignment. Without this the seeded admin is created unverified.
+        if (! $admin->hasVerifiedEmail()) {
+            $admin->forceFill(['email_verified_at' => now()])->save();
         }
 
         $admin->syncRoles([UserRole::ADMIN->value]);
