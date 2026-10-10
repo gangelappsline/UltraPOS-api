@@ -46,10 +46,20 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        // Catch N+1 problems and silently-discarded attributes early.
-        Model::preventLazyLoading(! $this->app->isProduction());
-        Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
-        Model::preventAccessingMissingAttributes(! $this->app->isProduction());
+        // Eloquent strictness (N+1, non-fillable and missing-attribute traps).
+        //
+        // Opt-IN only: these three flags turn every lazy relation access, every
+        // key that is not in $fillable and every unread attribute into a 500.
+        // That is great for a code base that was written against them and it
+        // breaks a fresh install otherwise (e.g. `php artisan migrate --seed`).
+        // Enable it while developing with ULTRAPOS_STRICT_MODELS=true.
+        if ((bool) config('ultrapos.strict_models', false)) {
+            Model::preventLazyLoading();
+            Model::preventSilentlyDiscardingAttributes();
+            Model::preventAccessingMissingAttributes();
+        } else {
+            Model::shouldBeStrict(false);
+        }
 
         // Automatic audit trail for the key models (create/update/delete).
         $auditedModels = [

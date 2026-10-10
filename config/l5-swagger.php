@@ -2,156 +2,145 @@
 
 declare(strict_types=1);
 
+/*
+|--------------------------------------------------------------------------
+| L5-Swagger 9 configuration
+|--------------------------------------------------------------------------
+|
+| Shape required by l5-swagger 9 (Darlington/l5-swagger):
+|   - "default"       : NAME of the active documentation (a string!)
+|   - "documentations": per-documentation overrides (merged over "defaults")
+|   - "defaults"      : everything else (scan options, UI, security, ...)
+|
+| The old laravel-swagger/L5 v2-v7 style where the whole config lived nested
+| under "default" is silently ignored: src/routes.php would iterate
+| config('l5-swagger.documentations') (empty → no /api/documentation route at
+| all) and GenerateDocumentationCommand would abort with
+| "Documentation config not found".
+|
+*/
+
 return [
-    'default' => [
-        'api' => [
-            'title' => env('L5_SWAGGER_API_TITLE', 'UltraPOS API'),
-        ],
 
-        'routes' => [
-            /*
-             * Route for accessing api documentation interface (Swagger UI).
-             */
-            'api' => 'api/documentation',
+    'default' => 'default',
 
-            /*
-             * Route prefix for serving the generated OpenAPI JSON document.
-             * Combined with "document_name" below this exposes the spec at
-             * GET /api/documentation.json
-             */
-            'docs' => 'api',
+    'documentations' => [
+        'default' => [
+            'api' => [
+                'title' => env('L5_SWAGGER_API_TITLE', 'UltraPOS API'),
+            ],
 
-            /*
-             * Route for OAUTH2 authentication callback.
-             */
-            'oauth2_callback' => 'api/oauth2-callback',
+            'routes' => [
+                // Swagger UI: GET /api/documentation
+                'api' => 'api/documentation',
 
-            /*
-             * Middleware allows to prevent unexpected access to API documentation
-             */
-            'middleware' => [
-                'api' => [
-                    \App\Http\Middleware\ForceJsonResponse::class,
+                // Raw OpenAPI document: GET /api/documentation.json
+                'docs' => 'api/documentation.json',
+            ],
+
+            'paths' => [
+                // Absolute path to location where parsed annotations are stored.
+                'docs' => storage_path('api-docs'),
+
+                // Include the absolute URL (instead of a relative one) for the
+                // assets Swagger UI loads.
+                'use_absolute_path' => env('L5_SWAGGER_USE_ABSOLUTE_PATH', true),
+
+                'swagger_ui_assets_path' => env('L5_SWAGGER_UI_ASSETS_PATH', 'vendor/swagger-api/swagger-ui/dist/'),
+
+                // File names generated inside "docs" (path) above.
+                'docs_json' => 'api-docs.json',
+                'docs_yaml' => 'api-docs.yaml',
+
+                // 'json' or 'yaml': which of the two files the UI renders.
+                'format_to_use_for_docs' => env('L5_FORMAT_TO_USE_FOR_DOCS', 'json'),
+
+                // Directories scanned for #[OA\...] attributes.
+                'annotations' => [
+                    base_path('app'),
                 ],
-                'asset' => [],
-                'docs' => [],
-                'oauth2_callback' => [],
             ],
 
             /*
-             * Route Group options
+             * Global security requirement for every operation. The scheme
+             * definitions themselves come from the #[OA\SecurityScheme]
+             * attributes in app/OpenApi/OpenApiInfo.php; "security" is what
+             * makes Swagger UI send the Authorization header on "Try it out".
              */
+            'securityDefinitions' => [
+                'security' => [
+                    ['passport' => []],
+                    ['bearerAuth' => []],
+                ],
+            ],
+        ],
+    ],
+
+    'defaults' => [
+        'routes' => [
+            'docs' => 'docs',
+            'oauth2_callback' => 'api/oauth2-callback',
+
+            // Extra middleware for the documentation routes. ForceJsonResponse
+            // keeps the JSON endpoint from ever being negotiated as HTML.
+            'middleware' => [
+                'api' => [],
+                'asset' => [],
+                'docs' => [\App\Http\Middleware\ForceJsonResponse::class],
+                'oauth2_callback' => [],
+            ],
+
             'group_options' => [],
         ],
 
         'paths' => [
-            /*
-             * Absolute path to location where parsed annotations will be stored
-             */
             'docs' => storage_path('api-docs'),
-
-            /*
-             * Absolute path to directory where to export views
-             */
-            'views' => resource_path('views/vendor/l5-swagger'),
-
-            /*
-             * Edit to set the api's base path
-             */
+            'views' => base_path('resources/views/vendor/l5-swagger'),
             'base' => env('L5_SWAGGER_BASE_PATH', null),
-
-            /*
-             * Absolute path to directory that contains the l5-swagger assets
-             */
-            'swagger_ui_assets_path' => env('L5_SWAGGER_UI_ASSETS_PATH', 'vendor/swagger-api/swagger-ui/dist/'),
-
-            /*
-             * File name of the generated json documentation file
-             */
-            'docs_json' => 'documentation.json',
-
-            /*
-             * File name of the generated YAML documentation file
-             */
-            'docs_yaml' => 'documentation.yaml',
-
-            /*
-             * Set this to `json` or `yaml` to determine which documentation file
-             * to use in UI
-             */
-            'format_to_use_for_docs' => env('L5_FORMAT_TO_USE_FOR_DOCS', 'json'),
-
-            /*
-             * Absolute paths to directory containing the swagger annotations
-             */
-            'annotations' => [
-                base_path('app'),
-            ],
+            'excludes' => [],
         ],
 
-        'components' => [
-            /*
-             * List of security schemes (OAuth2 Passport Bearer tokens).
-             */
-            'securitySchemes' => [
-                'passport' => [
-                    'type' => 'oauth2',
-                    'description' => 'Laravel Passport OAuth2 (password grant or personal access tokens). '
-                        .'Alternatively send the token as: Authorization: Bearer {token}',
-                    'flows' => [
-                        'password' => [
-                            'tokenUrl' => '/oauth/token',
-                            'scopes' => [
-                                'admin' => 'Global administrator scope',
-                                'business' => 'Business owner / manager scope',
-                                'seller' => 'Seller / cashier scope',
-                                'customer' => 'Customer scope',
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-            'security' => [
-                [
-                    'passport' => ['admin', 'business', 'seller', 'customer'],
-                ],
-            ],
+        'scanOptions' => [
+            'default_processors_configuration' => [],
+
+            // null = swagger-php's own StaticAnalyser. NOTE: l5-swagger passes
+            // this straight to OpenApi\Generator::setAnalyser(), which is
+            // typed ?AnalyserInterface — a class string here is a TypeError.
+            'analyser' => null,
+            'analysis' => null,
+            'processors' => [],
+            'pattern' => null,
+            'exclude' => [],
+
+            'open_api_spec_version' => env(
+                'L5_SWAGGER_OPEN_API_SPEC_VERSION',
+                \L5Swagger\Generator::OPEN_API_DEFAULT_SPEC_VERSION
+            ),
         ],
 
-        /*
-         * Set this to `true` in development mode so that docs are regenerated
-         * on every request.
-         */
+        'securityDefinitions' => [
+            'securitySchemes' => [],
+            'security' => [],
+        ],
+
+        // Regenerate on every request to /api/documentation (handy in dev).
         'generate_always' => env('L5_SWAGGER_GENERATE_ALWAYS', false),
 
-        /*
-         * Set this to `true` to generate a copy of documentation in yaml format
-         */
         'generate_yaml_copy' => env('L5_SWAGGER_GENERATE_YAML_COPY', false),
 
-        /*
-         * Edit to trust the proxy's ip address - needed for AWS Load Balancer
-         */
         'proxy' => false,
 
-        /*
-         * Configs plugin allows to fetch external configs instead of passing them to SwaggerUIBundle
-         */
         'additional_config_url' => null,
 
-        /*
-         * Apply a sort to the operation list of each API
-         */
         'operations_sort' => env('L5_SWAGGER_OPERATIONS_SORT', 'alpha'),
 
-        /*
-         * Pass the validatorUrl parameter to SwaggerUi init on the JS side
-         */
         'validator_url' => null,
 
-        /*
-         * Swagger UI configuration parameters
-         */
+        'constants' => [
+            // Referenced by App\OpenApi\OpenApiInfo as a PHP constant.
+            'L5_SWAGGER_CONST_HOST' => env('L5_SWAGGER_CONST_HOST', 'http://localhost:8000/api/v1'),
+        ],
+
         'ui' => [
             'display' => [
                 'dark_mode' => env('L5_SWAGGER_UI_DARK_MODE', true),
@@ -160,26 +149,13 @@ return [
             ],
 
             'authorization' => [
-                /*
-                 * If set to true, it persists authorization data and it would
-                 * not be lost on browser close/refresh.
-                 */
                 'persist_authorization' => env('L5_SWAGGER_UI_PERSIST_AUTHORIZATION', true),
 
                 'oauth2' => [
-                    /*
-                     * If set to true, adds PKCE to AuthorizationCodeGrant flow
-                     */
-                    'use_pkce_with_authorization_code_grant' => true,
+                    'use_pkce_with_authorization_code_grant' => false,
                 ],
             ],
         ],
-
-        /*
-         * Constants which can be used in annotations
-         */
-        'constants' => [
-            'L5_SWAGGER_CONST_HOST' => env('L5_SWAGGER_CONST_HOST', 'http://localhost:8000/api/v1'),
-        ],
     ],
+
 ];

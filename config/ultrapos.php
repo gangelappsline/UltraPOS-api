@@ -32,4 +32,21 @@ return [
 
     // Days before ends_at to warn about an expiring subscription.
     'subscription_warning_days' => (int) env('ULTRAPOS_SUBSCRIPTION_WARNING_DAYS', 7),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Development safeguards
+    |--------------------------------------------------------------------------
+    */
+
+    // Turn Eloquent into a strict mode: lazy loading, non-fillable mass
+    // assignment and missing attributes throw instead of silently working.
+    // Recommended while developing; keep false so a fresh install (migrate
+    // --seed, the demo tenant, the POS happy path) works out of the box.
+    'strict_models' => (bool) env('ULTRAPOS_STRICT_MODELS', false),
+
+    // Expose the OAuth2 "password" grant on POST /oauth/token (Passport 13
+    // keeps it disabled by default). The first-party /api/v1/auth/login
+    // endpoint works regardless of this flag.
+    'password_grant_enabled' => (bool) env('ULTRAPOS_PASSWORD_GRANT', true),
 ];

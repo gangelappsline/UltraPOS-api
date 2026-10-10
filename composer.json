@@ -3,12 +3,21 @@
     "name": "ultrapos/api",
     "type": "project",
     "description": "UltraPOS — Multi-tenant Point of Sale REST API built with Laravel 12 (Passport OAuth2, Spatie Permissions, L5-Swagger).",
-    "keywords": ["laravel", "pos", "api", "multi-tenant", "oauth2"],
+    "keywords": [
+        "laravel",
+        "pos",
+        "api",
+        "multi-tenant",
+        "oauth2"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.3",
         "ext-bcmath": "*",
+        "ext-fileinfo": "*",
         "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-openssl": "*",
         "ext-pdo": "*",
         "darkaonline/l5-swagger": "^9.0",
         "laravel/framework": "^12.0",
@@ -43,9 +52,6 @@
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
         ],
-        "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
-        ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
@@ -58,7 +64,15 @@
         ],
         "lint": [
             "pint"
+        ],
+        "docs": [
+            "@php artisan l5-swagger:generate --ansi"
         ]
+    },
+    "scripts-descriptions": {
+        "test": "Run the PHPUnit suite (uses sqlite in-memory via phpunit.xml).",
+        "lint": "Format the PHP sources with Laravel Pint.",
+        "docs": "Regenerate the OpenAPI document served at /api/documentation.json."
     },
     "extra": {
         "laravel": {

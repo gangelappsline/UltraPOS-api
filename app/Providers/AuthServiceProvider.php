@@ -56,10 +56,21 @@ class AuthServiceProvider extends ServiceProvider
             'reports.read' => 'Read reports',
         ]);
 
-        // Token lifetimes from config (minutes).
-        Passport::personalAccessTokensExpireIn(
-            now()->addMinutes((int) config('passport.token_lifetimes.personal_access', 10080))
+        // Token lifetimes from config (config/passport.php → .env).
+        $minutes = static fn (string $key, int $default): \DateInterval => new \DateInterval(
+            sprintf('PT%dM', max(1, (int) config("passport.token_lifetimes.{$key}", $default)))
         );
+
+        Passport::tokensExpireIn($minutes('access', 1440));
+        Passport::refreshTokensExpireIn($minutes('refresh', 43200));
+        Passport::personalAccessTokensExpireIn($minutes('personal_access', 10080));
+
+        // Passport 13 ships the OAuth2 password grant DISABLED. The docs
+        // (Swagger UI "Authorize" button) and any stock OAuth2 client expect
+        // POST /oauth/token with grant_type=password, so opt in explicitly.
+        if ((bool) config('ultrapos.password_grant_enabled', true)) {
+            Passport::enablePasswordGrant();
+        }
 
         // Super admin gate: "admin" role bypasses every policy.
         Gate::before(function (User $user, string $ability): ?bool {
